@@ -1,74 +1,235 @@
+
 <!DOCTYPE html>
-<html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>标语生成器</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<script type="text/javascript" src="http://lib.sinaapp.com/js/jquery/1.8.3/jquery.min.js"></script>
+<script type="text/javascript" src="ZeroClipboard.min.js"></script>
+<style>
+body,input {font-size:9pt;}
+textarea {font-family: '宋体','新宋体'; font-size: 14px;}
+label {font-weight: bold;}
+</style>
+</head>
 
-  <head>
-    <meta charset='utf-8' />
-    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
-    <meta name="description" content="Ascii : genarate ascii-art style texts" />
+<body>
+<p><input type="text" id="input" size="100"> <button id="btn_copy" data-clipboard-target="output">复制</button></p>
+<div>
+    <p>
+        <input name="method" value="plate" id="method_plate" type="radio" checked="checked" />
+        <label for="method_plate">举牌子</label>
+    </p>
+    <p>
+        <input name="method" value="wall" id="method_wall" type="radio" />
+        <label for="method_wall">墙体标语</label>
+        落款：<input id="wall_org" type="text" class="params" value=" 好 豆 网 宣" />
+    </p>
+    <p>
+        <input name="method" value="vertical" id="method_vertical" type="radio" />
+        <label for="method_vertical">竖排</label>
+        列数：<input id="vertical_cols" class="params" type="text" value="10" size="2" />
+        列高：<input id="vertical_height" class="params" type="text" value="6" size="2" />
+    </p>
+</div>
+<p><textarea rows="10" cols="100" id="output"></textarea></p>
+<script type="text/javascript">
+function GenMethod(options) {
+    this.msg = '';
+    this.options = $.extend({
+        layout: 'horizontal'
+    }, options || {});
 
-    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+    this.process = function(msg) {
+        var ret = [];
+        this.msg = msg;
+        var size = this.size();
 
-    <title>Ascii</title>
-  </head>
+        this.header && (ret = ret.concat(this.header(size.width)));
 
-  <body>
+        var cells = [], i, j, line;
+        this.cellPrefix && (cells[0] = this.cellPrefix());
+        for (i = 0; i < msg.length; i++) {
+            cells[cells.length] = this.cell(msg[i], i);
+        }
+        this.cellSuffix && (cells[cells.length] = this.cellSuffix());
+        for (i = 0; i < size.cellHeight; i++) {
+            line = '';
+            for (j = 0; j < cells.length; j++) {
+                line += cells[j][i];
+            }
+            ret[ret.length] = line;
+        }
 
-    <!-- HEADER -->
-    <div id="header_wrap" class="outer">
-        <header class="inner">
-          <a id="forkme_banner" href="https://github.com/nowgoo/ascii">View on GitHub</a>
+        this.footer && (ret = ret.concat(this.footer(size.width)));
 
-          <h1 id="project_title">Ascii</h1>
-          <h2 id="project_tagline">genarate ascii-art style texts</h2>
+        return ret.join("\r\n");
+    };
 
-            <section id="downloads">
-              <a class="zip_download_link" href="https://github.com/nowgoo/ascii/zipball/master">Download this project as a .zip file</a>
-              <a class="tar_download_link" href="https://github.com/nowgoo/ascii/tarball/master">Download this project as a tar.gz file</a>
-            </section>
-        </header>
-    </div>
+    this.repeat = function(chars, length) {
+        var ret = '', ret_len = 0, c = '', i = 0;
+        do {
+            if (i > chars.length-1) {
+                i = 0
+            };
+            c = chars[i];
+            ret += c;
+            ret_len += c.match(/[\x00-\xff]/) ? 1 : 2;
+            i = i+1;
+        } while (ret_len < length);
+        return ret;
+    };
+}
 
-    <!-- MAIN CONTENT -->
-    <div id="main_content_wrap" class="outer">
-      <section id="main_content" class="inner">
-        <h3>Welcome to GitHub Pages.</h3>
+// 举牌子
+var plate = new GenMethod();
+plate.size = function() {
+    return {
+        width: this.msg.length * 6 + 1,
+        cellHeight: 6
+    }
+};
+plate.cell = function(letter, index) {
+    var ret = [];
+    letter.match(/[\x00-\xff]/) && (letter += ' ');
+    ret[ret.length] = '┌—┐';
+    ret[ret.length] = '│' + letter + '│';
+    ret[ret.length] = '└┬┘';
+    ret[ret.length] = '   \\●';
+    if (index == 0) {
+        ret[ret.length] = '    ■';
+    } else if (index == this.msg.length-1) {
+        ret[ret.length] = '    ■\\';
+    } else {
+        ret[ret.length] = '\\   ■';
+    }
+    ret[ret.length] = '    ||';
+    return ret;
+};
 
-<p>This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here using GitHub Flavored Markdown, select a template crafted by a designer, and publish. After your page is generated, you can check out the new branch:</p>
+// 墙体标语
+var wall = new GenMethod();
+wall.size = function() {
+    return {
+        width: this.msg.length * 6 + 8,
+        cellHeight: 3
+    };
+};
+wall.header = function(width) {
+    return [
+        this.repeat('┬—', width),
+        this.repeat('┴┬', width)
+    ];
+};
+wall.cellPrefix = function() {
+    return ['┬┴', '┴┬', '┬┴'];
+};
+wall.cellSuffix = function() {
+    return ['┴┬', '┬┴', '┴┬'];
+};
+wall.cell = function(letter, index) {
+    if (letter === ' ') {
+        return ['┬┴┬', '┴┬┴', '┬┴┬'];
+    }
+    var ret = [];
+    letter.match(/[\x00-\xff]/) && (letter += ' ');
+    ret[ret.length] = '┏━┓';
+    ret[ret.length] = '┃' + letter + '┃';
+    ret[ret.length] = '┗━┛';
+    return ret;
+};
+wall.footer = function(width) {
+    var midLine = this.repeat('┬┴', width),
+        org = $('#wall_org').val(),
+        orgLen = Math.floor(org.replace(/[^\x00-\xff]/, '??').length / 2) + 2;
+    if (midLine.length > orgLen) {
+        midLine = midLine.substr(0, midLine.length-orgLen-2) + org + midLine.substr(midLine.length-2);
+    }
+    return [
+        this.repeat('┴┬', width),
+        midLine,
+        this.repeat('┴—', width)
+    ];
+};
 
-<pre><code>$ cd your_repo_root/repo_name
-$ git fetch origin
-$ git checkout gh-pages
-</code></pre>
+var vertical = {
+    process: function(msg) {
+        var cols = parseInt($('#vertical_cols').val()),
+            height = parseInt($('#vertical_height').val());
+        var matrix = [], i, j, c;
+        for (i = 0; i < height + 2; i++) {
+            var line = [];
+            for (j = 0; j < cols; j++) {
+                if (i === 0) {
+                    c = ['┯', '━'];
+                    if (j === 0) c = ['┏', '━'];
+                    if (j === cols-1) c = ['┯', '━', '┓'];
+                    line = line.concat(c);
+                } else if (i === height+1) {
+                    c = ['┷', '━'];
+                    if (j === 0) c = ['┗', '━'];
+                    if (j === cols-1) c = ['┷', '━', '┛'];
+                    line = line.concat(c);
+                } else {
+                    c = ['│', '　'];
+                    if (j === 0) c = ['┃', '　'];
+                    if (j === cols-1) c = ['│', '　', '┃'];
+                    line = line.concat(c);
+                }
+            }
+            matrix[matrix.length] = line;
+        }
 
-<p>If you're using the GitHub for Mac, simply sync your repository and you'll see the new branch.</p>
+        var x = cols, y = 1;
+        for (i = 0; i < msg.length; i++) {
+            if (y > height) {
+                x = x - 1;
+                y = 1;
+            }
+            c = msg[i];
+            if (c.match(/[\x00-\xff]/)) {
+                c = ' ' + c;
+            };
+            matrix[y][2*x-1] = c;
+            y++;
+        }
 
-<h3>Designer Templates</h3>
+        var ret = [];
+        for (i = 0; i< matrix.length; i++) {
+            ret[ret.length] = matrix[i].join('');
+        }
+        return ret.join("\r\n");
+    }
+};
 
-<p>We've crafted some handsome templates for you to use. Go ahead and continue to layouts to browse through them. You can easily go back to edit your page before publishing. After publishing your page, you can revisit the page generator and switch to another theme. Your Page content will be preserved if it remained markdown format.</p>
 
-<h3>Rather Drive Stick?</h3>
+var message = '',
+    input = $('#input');
+function updateOutput(){
+    message = input.val();
+    var method = $('input[name="method"]:checked').val();
+    $('#output').val(window[method].process(message));
+}
 
-<p>If you prefer to not use the automatic generator, push a branch named <code>gh-pages</code> to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.</p>
+window.setInterval(function(){
+    if (input.val() != message) {
+        updateOutput();
+    }
+}, 500);
 
-<h3>Authors and Contributors</h3>
+var clip = new ZeroClipboard(document.getElementById("btn_copy"), {
+    moviePath: "ZeroClipboard.swf"
+});
+clip.on('complete', function(client, args) {
+    var that = this;
+    that.innerHTML = '复制 √';
+    window.setTimeout(function(){
+        that.innerHTML = '复制';
+    }, 800);
+});
 
-<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor's GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>
-
-<h3>Support or Contact</h3>
-
-<p>Having trouble with Pages? Check out the documentation at <a href="http://help.github.com/pages">http://help.github.com/pages</a> or contact <a href="mailto:support@github.com">support@github.com</a> and we’ll help you sort it out.</p>
-      </section>
-    </div>
-
-    <!-- FOOTER  -->
-    <div id="footer_wrap" class="outer">
-      <footer class="inner">
-        <p class="copyright">Ascii maintained by <a href="https://github.com/nowgoo">nowgoo</a></p>
-        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
-      </footer>
-    </div>
-
-    
-
-  </body>
+$('input[name="method"]').click(updateOutput);
+$('input.params').blur(updateOutput);
+</script>
+</body>
 </html>
