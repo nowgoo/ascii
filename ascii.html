@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>标语生成器</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<script type="text/javascript" src="http://lib.sinaapp.com/js/jquery/1.8.3/jquery.min.js"></script>
+<script type="text/javascript" src="ZeroClipboard.min.js"></script>
+<style>
+body,input {font-size:9pt;}
+textarea {font-family: '宋体','新宋体'; font-size: 14px;}
+label {font-weight: bold;}
+</style>
+</head>
+
+<body>
+<p><input type="text" id="input" size="100"> <button id="btn_copy" data-clipboard-target="output">复制</button></p>
+<div>
+	<p>
+		<input name="method" value="plate" id="method_plate" type="radio" checked="checked" />
+		<label for="method_plate">举牌子</label>
+	</p>
+	<p>
+		<input name="method" value="wall" id="method_wall" type="radio" />
+		<label for="method_wall">墙体标语</label>
+		落款：<input id="wall_org" type="text" class="params" value=" 好 豆 网 宣" />
+	</p>
+	<p>
+		<input name="method" value="vertical" id="method_vertical" type="radio" />
+		<label for="method_vertical">竖排</label>
+		列数：<input id="vertical_cols" class="params" type="text" value="10" size="2" />
+		列高：<input id="vertical_height" class="params" type="text" value="6" size="2" />
+	</p>
+</div>
+<p><textarea rows="10" cols="100" id="output"></textarea></p>
+<script type="text/javascript">
+function GenMethod(options) {
+	this.msg = '';
+	this.options = $.extend({
+		layout: 'horizontal'
+	}, options || {});
+
+	this.process = function(msg) {
+		var ret = [];
+		this.msg = msg;
+		var size = this.size();
+
+		this.header && (ret = ret.concat(this.header(size.width)));
+
+		var cells = [], i, j, line;
+		this.cellPrefix && (cells[0] = this.cellPrefix());
+		for (i = 0; i < msg.length; i++) {
+			cells[cells.length] = this.cell(msg[i], i);
+		}
+		this.cellSuffix && (cells[cells.length] = this.cellSuffix());
+		for (i = 0; i < size.cellHeight; i++) {
+			line = '';
+			for (j = 0; j < cells.length; j++) {
+				line += cells[j][i];
+			}
+			ret[ret.length] = line;
+		}
+
+		this.footer && (ret = ret.concat(this.footer(size.width)));
+
+		return ret.join("\r\n");
+	};
+
+	this.repeat = function(chars, length) {
+		var ret = '', ret_len = 0, c = '', i = 0;
+		do {
+			if (i > chars.length-1) {
+				i = 0
+			};
+			c = chars[i];
+			ret += c;
+			ret_len += c.match(/[\x00-\xff]/) ? 1 : 2;
+			i = i+1;
+		} while (ret_len < length);
+		return ret;
+	};
+}
+
+// 举牌子
+var plate = new GenMethod();
+plate.size = function() {
+	return {
+		width: this.msg.length * 6 + 1,
+		cellHeight: 6
+	}
+};
+plate.cell = function(letter, index) {
+	var ret = [];
+	letter.match(/[\x00-\xff]/) && (letter += ' ');
+	ret[ret.length] = '┌—┐';
+	ret[ret.length] = '│' + letter + '│';
+	ret[ret.length] = '└┬┘';
+	ret[ret.length] = '   \\●';
+	if (index == 0) {
+		ret[ret.length] = '    ■';
+	} else if (index == this.msg.length-1) {
+		ret[ret.length] = '    ■\\';
+	} else {
+		ret[ret.length] = '\\   ■';
+	}
+	ret[ret.length] = '    ||';
+	return ret;
+};
+
+// 墙体标语
+var wall = new GenMethod();
+wall.size = function() {
+	return {
+		width: this.msg.length * 6 + 8,
+		cellHeight: 3
+	};
+};
+wall.header = function(width) {
+	return [
+		this.repeat('┬—', width),
+		this.repeat('┴┬', width)
+	];
+};
+wall.cellPrefix = function() {
+	return ['┬┴', '┴┬', '┬┴'];
+};
+wall.cellSuffix = function() {
+	return ['┴┬', '┬┴', '┴┬'];
+};
+wall.cell = function(letter, index) {
+	if (letter === ' ') {
+		return ['┬┴┬', '┴┬┴', '┬┴┬'];
+	}
+	var ret = [];
+	letter.match(/[\x00-\xff]/) && (letter += ' ');
+	ret[ret.length] = '┏━┓';
+	ret[ret.length] = '┃' + letter + '┃';
+	ret[ret.length] = '┗━┛';
+	return ret;
+};
+wall.footer = function(width) {
+	var midLine = this.repeat('┬┴', width),
+		org = $('#wall_org').val(),
+		orgLen = Math.floor(org.replace(/[^\x00-\xff]/, '??').length / 2) + 2;
+	if (midLine.length > orgLen) {
+		midLine = midLine.substr(0, midLine.length-orgLen-2) + org + midLine.substr(midLine.length-2);
+	}
+	return [
+		this.repeat('┴┬', width),
+		midLine,
+		this.repeat('┴—', width)
+	];
+};
+
+var vertical = {
+	process: function(msg) {
+		var cols = parseInt($('#vertical_cols').val()),
+			height = parseInt($('#vertical_height').val());
+		var matrix = [], i, j, c;
+		for (i = 0; i < height + 2; i++) {
+			var line = [];
+			for (j = 0; j < cols; j++) {
+				if (i === 0) {
+					c = ['┯', '━'];
+					if (j === 0) c = ['┏', '━'];
+					if (j === cols-1) c = ['┯', '━', '┓'];
+					line = line.concat(c);
+				} else if (i === height+1) {
+					c = ['┷', '━'];
+					if (j === 0) c = ['┗', '━'];
+					if (j === cols-1) c = ['┷', '━', '┛'];
+					line = line.concat(c);
+				} else {
+					c = ['│', '　'];
+					if (j === 0) c = ['┃', '　'];
+					if (j === cols-1) c = ['│', '　', '┃'];
+					line = line.concat(c);
+				}
+			}
+			matrix[matrix.length] = line;
+		}
+
+		var x = cols, y = 1;
+		for (i = 0; i < msg.length; i++) {
+			if (y > height) {
+				x = x - 1;
+				y = 1;
+			}
+			c = msg[i];
+			if (c.match(/[\x00-\xff]/)) {
+				c = ' ' + c;
+			};
+			matrix[y][2*x-1] = c;
+			y++;
+		}
+
+		var ret = [];
+		for (i = 0; i< matrix.length; i++) {
+			ret[ret.length] = matrix[i].join('');
+		}
+		return ret.join("\r\n");
+	}
+};
+
+
+var message = '',
+	input = $('#input');
+function updateOutput(){
+	message = input.val();
+	var method = $('input[name="method"]:checked').val();
+	$('#output').val(window[method].process(message));
+}
+
+window.setInterval(function(){
+	if (input.val() != message) {
+		updateOutput();
+	}
+}, 500);
+
+var clip = new ZeroClipboard(document.getElementById("btn_copy"), {
+	moviePath: "ZeroClipboard.swf"
+});
+clip.on('complete', function(client, args) {
+	var that = this;
+	that.innerHTML = '复制 √';
+	window.setTimeout(function(){
+		that.innerHTML = '复制';
+	}, 800);
+});
+
+$('input[name="method"]').click(updateOutput);
+$('input.params').blur(updateOutput);
+</script>
+</body>
+</html>
